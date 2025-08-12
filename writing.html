@@ -1,0 +1,443 @@
+<p data-ke-size="size16">&nbsp;</p>
+<p data-ke-size="size16">&nbsp;</p>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+<!-- Chosen Palette: Calm Harmony (Neutrals with subtle blue accents) -->
+<p data-ke-size="size16">&nbsp;</p>
+<!-- Application Structure Plan: A two-column layout with a persistent navigation sidebar on the left and a dynamic content area on the right. This structure is chosen over a linear document to facilitate quick, non-linear exploration and comparison between different complex reactor models. Users can select a model category and then a specific model, with the content pane updating instantly. This task-oriented design supports both quick lookups and in-depth study. -->
+<p data-ke-size="size16">&nbsp;</p>
+<!-- Visualization & Content Choices: Report Info: Model characteristics (equations, unknowns, use cases). Goal: Clarify relationships between abstract concepts for each model. Viz/Presentation: A structured HTML/CSS diagram will be used instead of a chart. It will visually link 'Governing Equations', 'Unknowns', 'Use Cases', and 'Solver Type' in a clear flow. Interaction: The diagram will be dynamically generated for the selected model. Justification: A static diagram is clearer than a complex chart for this type of relational data and avoids potential misinterpretation of quantitative axes. It directly supports the goal of understanding the model's conceptual framework. Library/Method: HTML/CSS with Tailwind for styling. CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+<p data-ke-size="size16">&nbsp;</p>
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+<p data-ke-size="size16">&nbsp;</p>
+<div class="flex h-screen"><!-- Sidebar -->
+<aside id="sidebar" class="w-64 bg-white shadow-lg p-4 overflow-y-auto transition-transform -translate-x-full md:translate-x-0 md:w-72 flex-shrink-0">
+<h1 class="text-xl font-bold text-sky-800 mb-6">Chemkin Models</h1>
+<nav id="model-nav" class="space-y-2"><!-- Navigation items will be injected here by JS --></nav></aside>
+<!-- Main Content --><main class="flex-1 p-4 md:p-8 overflow-y-auto"><button id="menu-toggle" class="md:hidden p-2 mb-4 bg-white rounded-md shadow"> </button>
+<div id="content-area" class="fade-in"><!-- Content will be injected here by JS --></div>
+</main></div>
+<script>
+        const chemkinData = {
+            "0d-batch": {
+                category: "0D Models",
+                title: "Closed Homogeneous Batch Reactor",
+                summary: {
+                    equations: "Ordinary differential equations (ODEs) for species and energy in a well-mixed, closed system.",
+                    unknowns: "Species concentrations (or mass fractions) and temperature.",
+                    use_cases: "Modeling transient ignition and kinetics in isolated systems.",
+                    applications: "Mechanism testing, auto-ignition studies, calculating equilibrium or ignition delay times.",
+                    solver: "Stiff ODE integration in time (Initial Value Problem), typically implicit (e.g., CVODE)."
+                },
+                details: {
+                    theory: `The closed homogeneous reactor assumes the gas is perfectly mixed (no spatial gradients), so only time evolution is considered. No mass enters or leaves. The governing equations derive from general conservation laws for a fixed mass of reacting gas. For each species $$k$$, the mass fraction $$Y_k(t)$$ changes according to chemical production/consumption: $$\\frac{dY_k}{dt} = \\frac{\\dot{\\omega}_k W_k}{\\rho}$$, where $$\\dot{\\omega}_k$$ is the molar production rate and $$W_k$$ the molecular weight. The energy equation can be written in terms of temperature. Under constant volume (isochoric adiabatic), no $$P,dV$$ work is done; pressure rises due to temperature increase. The temperature change follows from the internal energy change: $$\\frac{dT}{dt} = -\\frac{1}{\\rho c_v}\\sum_{k} h_k \\dot{\\omega}_k W_k$$. Under constant pressure, the volume expands to keep pressure fixed, performing work. In that case, the appropriate formulation uses mixture enthalpy $$h$$ (constant-pressure heat capacity $$c_p$$) so that $$\\frac{dT}{dt} = -\\frac{1}{\\rho c_p}\\sum_{k} h_k \\dot{\\omega}_k W_k$$.`,
+                    assumptions: "Mixing is uniform (zero-dimensional); no spatial gradients. The reactor is closed (mass-conserved). Ideal gas law is often assumed. Chemical kinetics can be detailed, making the ODE system stiff.",
+                    implementation: "In Chemkin, this is the “Closed Reactor” option (e.g., SENKIN). The user provides initial P (or V), T, and composition. The ODEs are integrated using stiff solvers (typically implicit multi-step with Newton iterations). Fundamental for computing ignition delays and constant-volume explosion pressure histories."
+                }
+            },
+            "0d-psr": {
+                category: "0D Models",
+                title: "Perfectly Stirred Reactor (PSR)",
+                summary: {
+                    equations: "Steady-state or transient algebraic/ODE equations for a continuously stirred tank reactor (CSTR) with inflow and outflow.",
+                    unknowns: "Species concentrations and temperature at steady-state.",
+                    use_cases: "Represents an ideal well-mixed combustor or CSTR where mixing is intense and uniform.",
+                    applications: "Gas-turbine primary zone modeling, afterburners, incinerators, finding blow-off limits.",
+                    solver: "Nonlinear algebraic equation methods (e.g., Newton-Raphson) for steady-state; stiff ODEs for transient."
+                },
+                details: {
+                    theory: `The Perfectly Stirred Reactor (PSR) is a 0D model of a continuously fed reactor where contents are perfectly mixed. Unlike the closed batch, a PSR has inlet and outlet flow at a specified residence time $$\\tau = V/\\dot{V}_{in}$$. At steady state, the species balance is: $$0 = \\dot m_{in}(Y_{k,in} - Y_k)/(\\rho V) + \\dot{\\omega}_k W_k/\\rho$$. The energy equation similarly balances enthalpy flow and heat generation. The reactor volume (or residence time) is a key parameter: it sets how long reactants remain to react.`,
+                    assumptions: "Contents are uniform (perfect mixing). No spatial gradients. Pressure is uniform and constant. Valid in reactors with strong recirculation where Damköhler number (mixing) >> 1 relative to flow.",
+                    implementation: "Chemkin’s PSR model allows both transient simulation and direct steady-state solution using modified damped Newton’s methods. Users specify reactor volume (or residence time) and feed conditions. Crucial in flame stabilization studies, e.g., mapping ignition/extinction S-curves."
+                }
+            },
+            "1d-premixed": {
+                category: "1D Models",
+                title: "Premixed Laminar Flame",
+                summary: {
+                    equations: "Steady 1D laminar flame equations (coupled ODE/PDE) for mass, species, energy, and momentum.",
+                    unknowns: "Profiles of temperature $$T(x)$$, species mass fractions $$Y_k(x)$$, and laminar flame speed $$s_L$$ (as an eigenvalue).",
+                    use_cases: "Computing laminar flame speed and flame structure for premixed gases.",
+                    applications: "Fundamental kinetics studies, burner design, pollutant formation studies, mechanism validation.",
+                    solver: "Two-point Boundary Value Problem (BVP) solved with finite-difference discretization and damped Newton iteration."
+                },
+                details: {
+                    theory: `A premixed laminar flame is a 1D propagation of a flame front into a premixed fuel/oxidizer mixture. A balance is achieved between convection of reactants and flame consumption. The governing equations are simplified reactive Navier-Stokes equations. Key equations include continuity ($$\\frac{d}{dx}(\\rho u) = 0$$), species transport ($$\\rho u \\frac{dY_k}{dx} = \\frac{d}{dx}(\\rho D_k \\frac{dY_k}{dx}) + \\dot{\\omega}_k W_k$$), and energy transport. For a freely propagating flame, the flame speed $$s_L$$ is an unknown eigenvalue of the BVP.`,
+                    assumptions: "Flame is planar and one-dimensional. Flow is laminar and steady. Pressure is constant. Transport model can be mixture-averaged or multicomponent.",
+                    implementation: "Chemkin-PRO Premixed Flame module (PREMIX) solves these equations using a BVP approach with adaptive mesh refinement. An initial guess is required. The solver uses continuation methods and pseudo-time stepping to converge difficult flames. It's a cornerstone for kinetic mechanism validation."
+                }
+            },
+            "1d-pfr": {
+                category: "1D Models",
+                title: "Plug Flow Reactor (PFR)",
+                summary: {
+                    equations: "Axial 1D convective reactor equations (first-order ODEs in space) assuming no radial gradients or axial dispersion.",
+                    unknowns: "Profiles of species, temperature, and pressure along the reactor length $$x$$.",
+                    use_cases: "Models tubular reactors where mixing is complete in cross-section but with no axial back-mixing.",
+                    applications: "Flow reactors, engine exhaust reactors, catalytic converters. Kinetic mechanism testing in flow conditions.",
+                    solver: "Initial Value Problem (IVP) ODE system integrated from inlet to outlet using stiff implicit solvers."
+                },
+                details: {
+                    theory: `A Plug Flow Reactor assumes unidirectional flow where fluid elements move in plug-like fashion. This idealization yields maximum conversion for a given volume. The governing equations are derived from species and energy balances over a differential volume element $$dV = A,dx$$. The result is a set of first-order ODEs in $$x$$. Species equation: $$\\frac{dY_k}{dx} = \\frac{\\dot{\\omega}_k W_k}{\\rho u}$$. Energy equation: $$\\frac{dT}{dx} = \\frac{-\\sum_k \\dot{\\omega}_k W_k h_k}{\\rho u c_p}$$ (adiabatic).`,
+                    assumptions: "No radial gradients. No axial mixing. Steady-state operation is usually assumed. Constant pressure is often assumed.",
+                    implementation: "Chemkin-Pro provides a PLUG reactor module. The user specifies inlet conditions, reactor geometry, and heat transfer parameters. The software integrates the stiff ODEs from $$x=0$$ to $$x=L$$. It's computationally efficient and often used in reactor networks."
+                }
+            },
+            "1d-counterflow": {
+                category: "1D Models",
+                title: "Counterflow Diffusion Flame",
+                summary: {
+                    equations: "Steady 1D stagnation-flow equations for two opposed streams (fuel and oxidizer) meeting at a stagnation plane.",
+                    unknowns: "Profiles of velocity $$u(x)$$, species $$Y_k(x)$$, and temperature $$T(x)$$ between the two nozzles.",
+                    use_cases: "Simulates a diffusion flame formed between two opposing jets to study flame structure and extinction at high strain.",
+                    applications: "Opposed-jet burner experiments, flamelet modeling in turbulent combustion, studying NOx formation.",
+                    solver: "Two-point Boundary Value Problem (BVP) solved with a modified Newton method and adaptive meshing."
+                },
+                details: {
+                    theory: `Characterized by two opposing flows, one of fuel and one of oxidizer, impinging to form a stagnation plane. A diffusion flame establishes where fuel and oxidizer mix. The problem is reduced from 2D to 1D via a similarity transformation. The strain rate $$a$$ (s-1) quantifies how fast the streams stretch the flame. High strain can extinguish the flame. The species and energy equations include convection towards the stagnation plane and diffusion.`,
+                    assumptions: "Steady state, laminar flow. Axisymmetric or planar stagnation flow. The flame is effectively flat and 1D along the symmetry axis. Low Mach number.",
+                    implementation: "Chemkin's OPPDIF module solves these equations as a BVP. The solution yields flame structure and can determine extinction limits. The solver uses Newton iterations on discretized equations with grid adaptation. Parametric continuation is used to find the maximum strain for which a steady flame exists (extinction point)."
+                }
+            },
+            "engine-hcci": {
+                category: "Engine Models",
+                title: "HCCI Engine Model",
+                summary: {
+                    equations: "0D single-zone model with time-varying volume (piston motion). Same as a closed homogeneous reactor but with a $$P,dV$$ work term.",
+                    unknowns: "Time profiles of species concentrations, temperature, and pressure from IVC to EVO.",
+                    use_cases: "Simulating auto-ignition (HCCI) combustion where the mixture ignites homogeneously without a flame.",
+                    applications: "HCCI engine research, knock predictions in SI engines, studying fuel chemistry effects on ignition.",
+                    solver: "Transient, stiff ODE system solved from Intake Valve Closure (IVC) to Exhaust Valve Opening (EVO) using implicit solvers."
+                },
+                details: {
+                    theory: `The HCCI model assumes the cylinder contents behave as a single homogeneous reactor with dynamically changing volume following piston motion. Volume $$V(t)$$ is prescribed by engine kinematics. The energy equation must account for piston work: $$dU = -P,dV - Q_{wall} + \\sum_k h_k dm_k$$. Combustion is treated purely as kinetic reaction throughout the charge. Heat transfer can be included via correlations (e.g., Woschni).`,
+                    assumptions: "The entire charge is uniform (single-zone). No flame propagation. Process from IVC to EVO is adiabatic aside from optional heat loss. Crevice effects are neglected.",
+                    implementation: "Chemkin-Pro's “Internal Combustion Engine (HCCI) Reactor” model. User inputs engine geometry and initial conditions at IVC. The software computes $$V(t)$$ and integrates the stiff ODEs for species and energy. It's excellent for capturing ignition timing and overall burn duration."
+                }
+            },
+            "engine-si": {
+                category: "Engine Models",
+                title: "SI Engine Zonal Model",
+                summary: {
+                    equations: "Two-zone model (unburned and burned) where each zone is a 0D reactor. Zones exchange mass through a flame interface.",
+                    unknowns: "Time profiles of each zone’s state: $$T_u(t)$$, $$T_b(t)$$, species compositions, and a common pressure $$P(t)$$.",
+                    use_cases: "Modeling spark-ignition combustion with a propagating flame, capturing different chemical environments.",
+                    applications: "Engine performance simulations, knock propensity analysis, emissions estimates (CO, NOx, HC).",
+                    solver: "Coupled, stiff ODE system for the two zones plus an algebraic constraint for pressure (DAE system)."
+                },
+                details: {
+                    theory: `Recognizes that a flame front separates burned and unburned gases. The model assumes each region is internally uniform but at different states. Mass transfers from the unburned to the burned zone as combustion proceeds, often governed by a prescribed Wiebe function: $$X_b(\\theta) = 1 - \\exp[-a((\\theta-\\theta_0)/\\Delta\\theta)^{m+1}]$$. Both zones share the same pressure $$P(t)$$.`,
+                    assumptions: "Each zone is homogeneous. The flame is an infinitely thin interface. Pressure is uniform throughout. The burn rate is prescribed by a semi-empirical function (e.g., Wiebe), not calculated from flame physics.",
+                    implementation: "Chemkin-Pro's SI Engine Zonal Simulator sets up two linked reactors. At spark timing, it begins transferring mass according to the burn rate. It's more computationally intensive than single-zone but far cheaper than 3D CFD, making it useful in design cycles."
+                }
+            },
+            "special-plasma": {
+                category: "Special Models",
+                title: "Plasma Reactor",
+                summary: {
+                    equations: "0D well-mixed reactor equations extended for plasma kinetics, including an electron energy equation.",
+                    unknowns: "Species concentrations (including charged species), gas temperature $$T_{gas}$$, and electron temperature $$T_e$$.",
+                    use_cases: "Modeling non-equilibrium, low-temperature plasma chemistry in a global sense.",
+                    applications: "Plasma etching/deposition reactors, plasma ignition/reforming, electric discharge chemistry.",
+                    solver: "Stiff ODE integration for transient behavior, often with an algebraic system for steady-state."
+                },
+                details: {
+                    theory: `In plasma reactors, energy from an external source primarily heats electrons. These energetic electrons drive reactions. The model adds an electron energy equation: $$\\frac{d}{dt}(n_e \\varepsilon_e) = Q_{power} - \\sum (\\text{energy losses})$$. Reaction rates for electron-impact reactions are strong functions of electron temperature $$T_e$$. Charge neutrality is assumed.`,
+                    assumptions: "Quasi-neutral, uniform plasma. Maxwellian electron energy distribution (EEDF), so a single $$T_e$$ is sufficient. The model doesn't resolve sheath regions near walls. $$T_e$$ can be much higher than gas temperature $$T_{gas}$$.",
+                    implementation: "Chemkin-Pro provides Closed Plasma and Plasma PSR models. The user supplies a mechanism with electron-impact reactions and specifies power deposition. The solver integrates the coupled ODEs for species and electron energy. It's a powerful tool for understanding plasma-chemical systems globally."
+                }
+            },
+            "special-pasr": {
+                category: "Special Models",
+                title: "Partially Stirred Reactor (PaSR)",
+                summary: {
+                    equations: "A stochastic extension of a PSR that includes finite-rate micro-mixing, often modeled with a population of interacting particles.",
+                    unknowns: "The probability density function (PDF) of composition, or the state of each stochastic particle.",
+                    use_cases: "Modeling turbulent reacting flows where finite mixing rates affect reaction rates.",
+                    applications: "Subgrid turbulence-chemistry interaction in CFD, reactor network approximations, mechanism reduction studies.",
+                    solver: "Monte Carlo simulation of many particles, each governed by ODEs with a stochastic mixing term (e.g., Curl's mixing model)."
+                },
+                details: {
+                    theory: `The PaSR bridges the gap between a PSR (infinite mixing) and a PFR (zero mixing). The reactor fluid is modeled as multiple "packets" or "eddies" that react internally and mix with each other at a finite frequency, $$\\omega_{mix}$$. A simple model for a particle $$p$$ is: $$\\frac{dY_k^{(p)}}{dt} = \\dot{\\omega}_k(Y^{(p)}) + \\omega_{mix}( \\bar{Y}_k - Y_k^{(p)})$$. The ratio of mixing timescale to chemical timescale determines the degree of segregation.`,
+                    assumptions: "Homogeneous isotropic turbulence concept with a single characteristic mixing timescale. Random collisions between eddies (Curl's model).",
+                    implementation: "Chemkin-Pro's PaSR module uses a Monte Carlo method (e.g., Pope's method) with a modified Curl's model for mixing. The user provides reactor conditions plus a mixing frequency. The simulation tracks an ensemble of interacting particles. It's a powerful tool to study cases where reaction and mixing rates compete."
+                }
+            },
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const navEl = document.getElementById('model-nav');
+            const contentEl = document.getElementById('content-area');
+            const menuToggle = document.getElementById('menu-toggle');
+            const sidebar = document.getElementById('sidebar');
+
+            const categories = {};
+            Object.keys(chemkinData).forEach(key => {
+                const model = chemkinData[key];
+                if (!categories[model.category]) {
+                    categories[model.category] = [];
+                }
+                categories[model.category].push({ id: key, title: model.title });
+            });
+
+            Object.keys(categories).forEach(category => {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'sidebar-category';
+                
+                const button = document.createElement('button');
+                button.className = 'w-full text-left font-semibold text-slate-600 p-2 rounded-md hover:bg-slate-100 flex justify-between items-center';
+                button.innerHTML = `<span>${category}</span><svg class="w-4 h-4 transition-transform" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>`;
+                button.onclick = () => {
+                    categoryDiv.classList.toggle('open');
+                    button.querySelector('svg').classList.toggle('rotate-180');
+                };
+                
+                const sublist = document.createElement('div');
+                sublist.className = 'pl-4 mt-1 space-y-1';
+
+                categories[category].forEach(model => {
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.textContent = model.title;
+                    link.className = 'block p-2 text-sm text-slate-500 rounded-md hover:bg-slate-100 sidebar-item';
+                    link.dataset.modelId = model.id;
+                    link.onclick = (e) => {
+                        e.preventDefault();
+                        displayModel(model.id);
+                        document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+                        link.classList.add('active');
+                        if (window.innerWidth < 768) {
+                           sidebar.classList.add('-translate-x-full');
+                        }
+                    };
+                    sublist.appendChild(link);
+                });
+                
+                categoryDiv.appendChild(button);
+                categoryDiv.appendChild(sublist);
+                navEl.appendChild(categoryDiv);
+            });
+
+            menuToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+            });
+
+            function displayModel(modelId) {
+                const model = chemkinData[modelId];
+                if (!model) {
+                    contentEl.innerHTML = `<p>Select a model to view its details.</p>`;
+                    return;
+                }
+
+                contentEl.innerHTML = `
+                    <div class="content-card p-6 md:p-8 fade-in">
+                        <h2 class="text-2xl md:text-3xl font-bold text-slate-900 mb-4">${model.title}</h2>
+                        <p class="text-slate-600 mb-8">An interactive overview of the ${model.title} model, its governing principles, and applications.</p>
+                        
+                        <div class="border-b border-slate-200 mb-6">
+                            <nav class="flex space-x-4" aria-label="Tabs">
+                                <button class="tab active whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm" data-tab="summary">Quick Summary</button>
+                                <button class="tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-slate-500 hover:text-slate-700" data-tab="details">In-Depth Theory</button>
+                                <button class="tab whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-slate-500 hover:text-slate-700" data-tab="diagram">Conceptual Diagram</button>
+                            </nav>
+                        </div>
+
+                        <div id="tab-content">
+                            <!-- Tab content will be injected here -->
+                        </div>
+                    </div>
+                `;
+                
+                const tabs = contentEl.querySelectorAll('.tab');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        renderTabContent(modelId, tab.dataset.tab);
+                    });
+                });
+
+                renderTabContent(modelId, 'summary');
+                setTimeout(() => MathJax.typesetPromise(), 0);
+            }
+
+            async function callGeminiAPI(prompt, outputElement) {
+                outputElement.innerHTML = `
+                    <div class="flex items-center space-x-2 text-slate-500">
+                        <svg class="animate-spin h-5 w-5 text-sky-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Generating response...</span>
+                    </div>
+                `;
+                
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                let response;
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000;
+
+                while (retries < maxRetries) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.status === 429) {
+                            retries++;
+                            const delay = baseDelay * Math.pow(2, retries - 1);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+
+                        if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+                        
+                        const result = await response.json();
+                        if (result.candidates && result.candidates.length > 0 &&
+                            result.candidates[0].content && result.candidates[0].content.parts &&
+                            result.candidates[0].content.parts.length > 0) {
+                            const text = result.candidates[0].content.parts[0].text;
+                            outputElement.innerHTML = `<p class="text-sm text-slate-700 mt-4">${text}</p>`;
+                            MathJax.typesetPromise();
+                        } else {
+                            outputElement.innerHTML = `<p class="text-sm text-red-500 mt-4">Error: No content generated.</p>`;
+                        }
+                        return;
+
+                    } catch (error) {
+                        outputElement.innerHTML = `<p class="text-sm text-red-500 mt-4">Error: ${error.message}</p>`;
+                        return;
+                    }
+                }
+            }
+
+
+            function renderTabContent(modelId, tabName) {
+                const model = chemkinData[modelId];
+                const tabContentEl = document.getElementById('tab-content');
+                let content = '';
+
+                if (tabName === 'summary') {
+                    content = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 fade-in">
+                            <div class="bg-slate-50 p-4 rounded-lg">
+                                <h3 class="font-semibold text-slate-700 mb-2">Governing Equations</h3>
+                                <p class="text-sm text-slate-600">${model.summary.equations}</p>
+                            </div>
+                             <div class="bg-slate-50 p-4 rounded-lg">
+                                <h3 class="font-semibold text-slate-700 mb-2">Key Unknowns</h3>
+                                <p class="text-sm text-slate-600">${model.summary.unknowns}</p>
+                            </div>
+                             <div class="bg-slate-50 p-4 rounded-lg">
+                                <h3 class="font-semibold text-slate-700 mb-2">Use Cases</h3>
+                                <p class="text-sm text-slate-600">${model.summary.use_cases}</p>
+                            </div>
+                             <div class="bg-slate-50 p-4 rounded-lg">
+                                <h3 class="font-semibold text-slate-700 mb-2">Applications</h3>
+                                <p class="text-sm text-slate-600">${model.summary.applications}</p>
+                            </div>
+                             <div class="bg-slate-50 p-4 rounded-lg md:col-span-2">
+                                <h3 class="font-semibold text-slate-700 mb-2">Numerical Solver Type</h3>
+                                <p class="text-sm text-slate-600">${model.summary.solver}</p>
+                            </div>
+                        </div>
+                    `;
+                } else if (tabName === 'details') {
+                    content = `
+                        <div class="space-y-6 prose prose-slate max-w-none fade-in">
+                            <div>
+                                <h3 class="text-xl font-semibold mb-2">Theoretical Background</h3>
+                                <div class="math-display">${model.details.theory}</div>
+                            </div>
+                             <div>
+                                <h3 class="text-xl font-semibold mb-2">Key Assumptions</h3>
+                                <p>${model.details.assumptions}</p>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-semibold mb-2">Chemkin Implementation</h3>
+                                <p>${model.details.implementation}</p>
+                            </div>
+                             <div class="mt-8 pt-4 border-t border-slate-200">
+                                <h3 class="text-xl font-semibold mb-2">AI-Powered Insights</h3>
+                                <div class="flex space-x-2 mb-4">
+                                    <button id="summarize-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors">✨ Summarize with AI</button>
+                                    <button id="analogy-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-medium py-2 px-4 rounded-lg shadow-md transition-colors">✨ Explain with Analogy</button>
+                                </div>
+                                <div id="ai-response" class="p-4 bg-slate-100 rounded-lg">
+                                    <p class="text-sm text-slate-600">Click a button above to generate a summary or a simple explanation of this model.</p>
+                                </div>
+                             </div>
+                        </div>
+                    `;
+                } else if (tabName === 'diagram') {
+                    content = `
+                        <div class="fade-in p-4 bg-slate-50 rounded-lg">
+                            <h3 class="text-xl font-semibold mb-4 text-center">Model Workflow</h3>
+                            <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4 text-center">
+                                <div class="p-4 bg-white rounded-lg shadow-md concept-diagram-arrow">
+                                    <h4 class="font-bold text-sky-700">Physical Problem</h4>
+                                    <p class="text-sm">${model.summary.use_cases}</p>
+                                </div>
+                                <div class="p-4 bg-white rounded-lg shadow-md concept-diagram-arrow">
+                                    <h4 class="font-bold text-sky-700">Governing Equations</h4>
+                                    <p class="text-sm">${model.summary.equations}</p>
+                                </div>
+                                <div class="p-4 bg-white rounded-lg shadow-md concept-diagram-arrow">
+                                    <h4 class="font-bold text-sky-700">Numerical Solver</h4>
+                                     <p class="text-sm">${model.summary.solver}</p>
+                                </div>
+                                <div class="p-4 bg-white rounded-lg shadow-md">
+                                    <h4 class="font-bold text-sky-700">Solution</h4>
+                                    <p class="text-sm">${model.summary.unknowns}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                tabContentEl.innerHTML = content;
+                if(tabName === 'details') {
+                    setTimeout(() => {
+                        MathJax.typesetPromise();
+                        const summarizeBtn = document.getElementById('summarize-btn');
+                        const analogyBtn = document.getElementById('analogy-btn');
+                        const aiResponseDiv = document.getElementById('ai-response');
+
+                        if (summarizeBtn) {
+                            summarizeBtn.addEventListener('click', () => {
+                                const prompt = `Provide a one-sentence, high-level summary of the following Chemkin reactor model: ${model.details.theory} ${model.details.assumptions}`;
+                                callGeminiAPI(prompt, aiResponseDiv);
+                            });
+                        }
+                        if (analogyBtn) {
+                            analogyBtn.addEventListener('click', () => {
+                                const prompt = `Explain the following Chemkin reactor model using a simple, non-technical analogy. The target audience is a child. Focus on the core principles: ${model.details.theory} ${model.details.assumptions}`;
+                                callGeminiAPI(prompt, aiResponseDiv);
+                            });
+                        }
+                    }, 0);
+                } else {
+                    setTimeout(() => MathJax.typesetPromise(), 0);
+                }
+            }
+            
+            // Initial display
+            const firstModelId = Object.keys(chemkinData)[0];
+            const firstCategoryDiv = navEl.querySelector('.sidebar-category');
+            firstCategoryDiv.classList.add('open');
+            firstCategoryDiv.querySelector('svg').classList.add('rotate-180');
+            const firstLink = navEl.querySelector('.sidebar-item');
+            firstLink.classList.add('active');
+            displayModel(firstModelId);
+        });
+    </script>
+<div>
